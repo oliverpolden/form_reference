@@ -253,7 +253,7 @@ function form_reference_options_list($field, $instance = NULL, $entity_type = NU
   foreach ($settings as $category_key => $category) {
     if (is_array($category) && !empty($category)) {
       reset($category);
-      if ($category_key != 'Auto-discovery') {
+      if (!in_array($category_key, array('Auto-discovery', 'Manual', 'Custom'))) {
         foreach ($category as $category_name => $category_forms) {
           foreach ($category_forms as $form => $value) {
             if (!$value) {
@@ -284,7 +284,9 @@ function form_reference_options_list($field, $instance = NULL, $entity_type = NU
   // Custom forms.
   $custom_forms = explode("\r\n", $settings['Manual']['custom']['custom']);
   foreach ($custom_forms as $form) {
-    $form_options['Custom'][$form] = $form;
+    if ($form) {
+      $form_options['Custom'][$form] = $form;
+    }
   }
 
   return $form_options;
