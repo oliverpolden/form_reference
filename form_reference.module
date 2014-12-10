@@ -1,0 +1,315 @@
+<?php
+/**
+ * @file
+ * An example field using the Field Types API.
+ */
+
+/**
+ * Implements hook_field_info().
+ *
+ * Provides the description of the field.
+ */
+function form_reference_field_info() {
+  return array(
+    // We name our field as the associative name of the array.
+    'form_reference' => array(
+      'label' => t('Form reference'),
+      'description' => t('Load a referenced form.'),
+      'default_widget' => 'options_select',
+      'default_formatter' => 'form_reference_form',
+      'settings' => array(
+        'Content types' => array('content_types' => array()),
+        'Core' => array('core' => array()),
+        'Auto-discovery' => array('modules' => array()),
+        'Manual' => array(
+          'custom' => array(
+            'custom' => array(),
+            'ad_hoc' => 0,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_validate().
+ *
+ * @see form_reference_field_widget_error()
+ */
+function form_reference_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+
+}
+
+
+/**
+ * Implements hook_field_is_empty().
+ *
+ * hook_field_is_empty() is where Drupal asks us if this field is empty.
+ * Return TRUE if it does not contain data, FALSE if it does. This lets
+ * the form API flag an error when required fields are empty.
+ */
+function form_reference_field_is_empty($item, $field) {
+  return empty($item['form_reference']);
+}
+
+function form_reference_field_settings_form($field, $instance, $has_data) {
+  // Drupal conventions.
+  // Content types.
+  $types = array();
+  foreach (node_type_get_types() as $type_id => $type) {
+    $types['node:' . $type_id] = $type->name;
+  }
+  $form['Content types'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Content types'),
+    '#description' => t('Allow content type forms to be referenced.'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['Content types']['content_types'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Content types'),
+    '#options' => $types,
+    '#default_value' => $field['settings']['Content types']['content_types'],
+  );
+
+  // Core forms.
+  $core_forms = array(
+    'user_register_form' => t('Create user'),
+    'contact_site_form' => t('Contact form'),
+    'search_form' => t('Search form'),
+  );
+  $form['Core'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Other forms'),
+    '#description' => t('Core Drupal forms that can be referenced.'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['Core']['core'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Other forms'),
+    '#options' => $core_forms,
+    '#default_value' => $field['settings']['Core']['core'],
+  );
+
+  // Auto-discovery.
+  $optional_modules = form_reference_optional_modules();
+  $module_links = array();
+  foreach ($optional_modules as $module => $module_name) {
+    $module_links[] = l($module_name, 'http://www.drupal.org/project/' . $module);
+    // Do not present modules as options that aren't enabled.
+    if (!module_exists($module)) {
+      unset($optional_modules[$module]);
+    }
+  }
+  $form['Auto-discovery'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Auto-discovery'),
+    '#description' => t('Forms that extend a PHP base class can be auto-discovered:
+    <br />') . implode(', ', $module_links),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['Auto-discovery']['modules'] = array(
+    '#type' => 'checkboxes',
+    '#options' => $optional_modules,
+    '#default_value' => $field['settings']['Auto-discovery']['modules'],
+  );
+
+  // Manual entry.
+  $form['Manual'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Manual'),
+    '#description' => t('Manually specify forms that can be referenced.'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  $form['Manual']['custom']['custom'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Pre-defined'),
+    '#description' => t('Manually enter forms that can be referenced. One per line.'),
+    '#default_value' => $field['settings']['Manual']['custom']['custom'],
+  );
+  $form['Manual']['custom']['ad_hoc'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Ad-hoc'),
+    '#description' => t('Allow users to manually enter a form reference. This displays a text field for manual entry.'),
+    '#default_value' => $field['settings']['Manual']['custom']['ad_hoc'],
+    '#return_value' => 'ad_hoc',
+  );
+
+  return $form;
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ *
+ * We need to tell Drupal that we have two different types of formatters
+ * for this field. One will change the text color, and the other will
+ * change the background color.
+ *
+ * @see form_reference_field_formatter_view()
+ */
+function form_reference_field_formatter_info() {
+  return array(
+    'form_reference_form' => array(
+      'label' => t('Render form'),
+      'field types' => array('form_reference'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ *
+ * @see form_reference_field_formatter_info()
+ */
+function form_reference_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+  switch ($display['type']) {
+    case 'form_reference_form':
+      foreach ($items as $delta => $item) {
+        if (strpos($item['form_reference'], 'node:') !== FALSE) {
+          module_load_include('inc', 'node', 'node.pages');
+          $content_type = str_replace('node:', '', $item['form_reference']);
+          $element[$delta] = node_add($content_type);
+        }
+        else {
+          $element[$delta] = drupal_get_form($item['form_reference']);
+        }
+      }
+      break;
+  }
+
+  return $element;
+}
+
+/**
+ * Implements hook_field_widget_info().
+ * These widget types will eventually show up in hook_field_widget_form,
+ * where we will have to flesh them out.
+ *
+ * @see form_reference_field_widget_form()
+ */
+/*function form_reference_field_widget_info() {
+  return array(
+    'form_reference_text' => array(
+      'label' => t(''),
+      'field types' => array('form_reference'),
+    ),
+  );
+}*/
+
+/**
+ * Implements hook_field_widget_info_alter().
+ */
+function form_reference_field_widget_info_alter(&$info) {
+  if (module_exists('options')) {
+    $info['options_select']['field types'][] = 'form_reference';
+  }
+}
+
+/**
+ * Implements hook_field_widget_form().
+ *
+ * hook_widget_form() is where Drupal tells us to create form elements for
+ * our field's widget.
+ */
+function form_reference_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  return $element;
+}
+
+/**
+ * Implements hook_field_widget_error().
+ *
+ * hook_field_widget_error() lets us figure out what to do with errors
+ * we might have generated in hook_field_validate(). Generally, we'll just
+ * call form_error().
+ *
+ * @see form_reference_field_validate()
+ * @see form_error()
+ */
+function form_reference_field_widget_error($element, $error, $form, &$form_state) {
+  switch ($error['error']) {
+    case 'form_reference_invalid':
+      form_error($element, $error['message']);
+      break;
+  }
+}
+
+/**
+ * @} End of "defgroup form_reference".
+ */
+
+/**
+ * Implements hook_options_list().
+ */
+function form_reference_options_list($field, $instance = NULL, $entity_type = NULL, $entity = NULL) {
+  // Content types.
+  $settings = $field['settings'];
+  $form_options = array();
+  foreach ($settings as $category_key => $category) {
+    if (is_array($category) && !empty($category)) {
+      reset($category);
+      if ($category_key != 'Auto-discovery') {
+        foreach ($category as $category_name => $category_forms) {
+          foreach ($category_forms as $form => $value) {
+            if (!$value) {
+              unset($category[$category_name][$form]);
+            }
+          }
+        }
+        if (key($category)) {
+          $form_options[drupal_ucfirst($category_key)] = $category[key($category)];
+        }
+      }
+    }
+  }
+
+  // Auto-discovery of optional modules.
+  $optional_modules = form_reference_optional_modules('namespace');
+  foreach ($settings['Auto-discovery']['modules'] as $parent_class) {
+    if ($parent_class) {
+      foreach (get_declared_classes() as $class) {
+        if (is_subclass_of($class, $optional_modules[$parent_class])) {
+          $form_options['Auto-discovery'][$class::getFormId()] = $class::getFormId();
+        }
+      }
+    }
+  }
+  unset($form_options['auto_discovery']['modules']);
+
+  // Custom forms.
+  $custom_forms = explode("\r\n", $settings['Manual']['custom']['custom']);
+  foreach ($custom_forms as $form) {
+    $form_options['Custom'][$form] = $form;
+  }
+
+  return $form_options;
+}
+
+/*
+ * Returns optional modules for auto-discovery.
+ *
+ * $return_value - What elements to return.
+ */
+function form_reference_optional_modules($return_value = 'name') {
+  $optional_modules = array(
+    'cool' => array(
+      'namespace' =>'Drupal\cool\BaseForm',
+      'name' => 'Cool',
+    ),
+    'ghost' => array(
+      'namespace' => 'Drupal\ghost\Form\BaseForm',
+      'name' => 'Ghost',
+    ),
+  );
+  $return = array();
+  foreach ($optional_modules as $module_key => $module) {
+    $return[$module_key] = $module[$return_value];
+  }
+
+  return $return;
+}
