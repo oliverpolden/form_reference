@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * An example field using the Field Types API.
+ * Form reference field.
  */
 
 /**
@@ -11,7 +11,6 @@
  */
 function form_reference_field_info() {
   return array(
-    // We name our field as the associative name of the array.
     'form_reference' => array(
       'label' => t('Form reference'),
       'description' => t('Load a referenced form.'),
@@ -21,12 +20,8 @@ function form_reference_field_info() {
         'Content types' => array('content_types' => array()),
         'Core' => array('core' => array()),
         'Auto-discovery' => array('modules' => array()),
-        'Manual' => array(
-          'custom' => array(
-            'custom' => array(),
-            'ad_hoc' => 0,
-          ),
-        ),
+        'Module specified' => array('specified' => array()),
+        'Manual' => array('custom' => array('custom' => '')),
       ),
     ),
   );
@@ -38,7 +33,16 @@ function form_reference_field_info() {
  * @see form_reference_field_widget_error()
  */
 function form_reference_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
-
+  foreach ($items as $delta => $item) {
+    if (!empty($item['form_reference'])) {
+      if (!form_reference_load_includes($item['form_reference'])) {
+        $errors[$field['field_name']][$langcode][$delta][] = array(
+          'error' => 'invalid_form',
+          'message' => t('The form %form could not be found.', array('%form' => $item['form_reference'])),
+        );
+      }
+    }
+  }
 }
 
 
@@ -53,6 +57,9 @@ function form_reference_field_is_empty($item, $field) {
   return empty($item['form_reference']);
 }
 
+/**
+ * Implements hook_field_settings_form().
+ */
 function form_reference_field_settings_form($field, $instance, $has_data) {
   // Drupal conventions.
   // Content types.
@@ -75,14 +82,11 @@ function form_reference_field_settings_form($field, $instance, $has_data) {
   );
 
   // Core forms.
-  $core_forms = array(
-    'user_register_form' => t('Create user'),
-    'contact_site_form' => t('Contact form'),
-    'search_form' => t('Search form'),
-  );
+  $core_forms = form_reference_form_options(form_reference_core_forms());
+
   $form['Core'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Other forms'),
+    '#title' => t('Core forms'),
     '#description' => t('Core Drupal forms that can be referenced.'),
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
@@ -118,6 +122,21 @@ function form_reference_field_settings_form($field, $instance, $has_data) {
     '#default_value' => $field['settings']['Auto-discovery']['modules'],
   );
 
+  $form['Module specified'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Module specified'),
+    '#description' => t('Modules that implement hook_form_reference will appear here.'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+
+  );
+  $form['Module specified']['specified'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Module specified'),
+    '#options' => form_reference_form_references(),
+    '#default_value' => $field['settings']['Module specified']['specified'],
+  );
+
   // Manual entry.
   $form['Manual'] = array(
     '#type' => 'fieldset',
@@ -131,26 +150,115 @@ function form_reference_field_settings_form($field, $instance, $has_data) {
     '#title' => t('Pre-defined'),
     '#description' => t('Manually enter forms that can be referenced. One per line.'),
     '#default_value' => $field['settings']['Manual']['custom']['custom'],
-  );
-  $form['Manual']['custom']['ad_hoc'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Ad-hoc'),
-    '#description' => t('Allow users to manually enter a form reference. This displays a text field for manual entry.'),
-    '#default_value' => $field['settings']['Manual']['custom']['ad_hoc'],
-    '#return_value' => 'ad_hoc',
+    '#element_validate' => array('form_reference_validate'),
   );
 
   return $form;
 }
 
 /**
+ * Converts passed forms into select options.
+ *
+ * @param array $forms
+ *   Array of forms. @see form_reference_core_forms().
+ *
+ * @return array
+ */
+function form_reference_form_options($forms) {
+  $form_options = array();
+
+  // Check the forms exist.
+  foreach ($forms as $form_id => $form) {
+    if (form_reference_load_include($form, $form_id)) {
+      $form_options[$form_id] = $form['name'];
+    }
+  }
+
+  return $form_options;
+}
+
+/**
+ * @param $form
+ *   The form definition.
+ * @param $form_id
+ *   The form_id.
+
+ * @return bool
+ */
+function form_reference_load_include($form, $form_id) {
+  if (isset($form['file']) && isset($form['module'])) {
+    $parts = explode('.', $form['file']);
+    $type = array_pop($parts);
+    module_load_include($type, $form['module'], implode('.', $parts));
+  }
+  if (function_exists($form_id)) {
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+function form_reference_all_forms() {
+  $core_forms = form_reference_core_forms();
+  $module_forms = form_reference_form_references();
+
+  return array_merge($core_forms, $module_forms);
+}
+
+/**
+ * Information about core forms.
+ *
+ * @return array
+ */
+function form_reference_core_forms() {
+  $core_forms = array(
+    'user_login' => array(
+      'name' => t('User Login'),
+    ),
+    'user_register_form' => array(
+      'name' => t('Create user'),
+    ),
+    'contact_site_form' => array(
+      'name' => t('Contact form'),
+      'module' => 'contact',
+      'file' => 'contact.pages.inc',
+    ),
+    'search_form' => array(
+      'name' => t('Search form'),
+    ),
+  );
+
+  return $core_forms;
+}
+
+/**
+ * Validation function for manually entered forms.e
+ *
+ * @param $element
+ * @param $form_state
+ */
+function form_reference_validate($element, &$form_state) {
+  $value = $element['#value'];
+  if (!empty($value)) {
+    // Check manually entered forms exist.
+    $custom_forms = explode("\r\n", $value);
+    $messages = array();
+    $valid = TRUE;
+    foreach ($custom_forms as $form) {
+      // This won't work for class based forms but these should be auto-discovered.
+      if (!function_exists($form)) {
+        $valid = FALSE;
+        $messages[] = t("The form %form doesn't exist.", array('%form' => $form));
+      }
+    }
+    if (!$valid) {
+      form_error($element, implode('<br />', $messages));
+    }
+  }
+}
+
+/**
  * Implements hook_field_formatter_info().
- *
- * We need to tell Drupal that we have two different types of formatters
- * for this field. One will change the text color, and the other will
- * change the background color.
- *
- * @see form_reference_field_formatter_view()
  */
 function form_reference_field_formatter_info() {
   return array(
@@ -163,14 +271,13 @@ function form_reference_field_formatter_info() {
 
 /**
  * Implements hook_field_formatter_view().
- *
- * @see form_reference_field_formatter_info()
  */
 function form_reference_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = array();
   switch ($display['type']) {
     case 'form_reference_form':
       foreach ($items as $delta => $item) {
+        form_reference_load_includes($item['form_reference']);
         if (strpos($item['form_reference'], 'node:') !== FALSE) {
           module_load_include('inc', 'node', 'node.pages');
           $content_type = str_replace('node:', '', $item['form_reference']);
@@ -187,20 +294,22 @@ function form_reference_field_formatter_view($entity_type, $entity, $field, $ins
 }
 
 /**
- * Implements hook_field_widget_info().
- * These widget types will eventually show up in hook_field_widget_form,
- * where we will have to flesh them out.
+ * Loads include files for a form.
  *
- * @see form_reference_field_widget_form()
+ * @param $form_id
+ *
+ * @return bool
  */
-/*function form_reference_field_widget_info() {
-  return array(
-    'form_reference_text' => array(
-      'label' => t(''),
-      'field types' => array('form_reference'),
-    ),
-  );
-}*/
+function form_reference_load_includes($form_id) {
+  $forms = form_reference_all_forms();
+
+  if (isset($forms[$form_id]) && isset($forms[$form_id]['file'])) {
+    return form_reference_load_include($forms[$form_id], $form_id);
+  }
+  else {
+    return FALSE;
+  }
+}
 
 /**
  * Implements hook_field_widget_info_alter().
@@ -209,16 +318,6 @@ function form_reference_field_widget_info_alter(&$info) {
   if (module_exists('options')) {
     $info['options_select']['field types'][] = 'form_reference';
   }
-}
-
-/**
- * Implements hook_field_widget_form().
- *
- * hook_widget_form() is where Drupal tells us to create form elements for
- * our field's widget.
- */
-function form_reference_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
-  return $element;
 }
 
 /**
@@ -240,10 +339,6 @@ function form_reference_field_widget_error($element, $error, $form, &$form_state
 }
 
 /**
- * @} End of "defgroup form_reference".
- */
-
-/**
  * Implements hook_options_list().
  */
 function form_reference_options_list($field, $instance = NULL, $entity_type = NULL, $entity = NULL) {
@@ -252,7 +347,6 @@ function form_reference_options_list($field, $instance = NULL, $entity_type = NU
   $form_options = array();
   foreach ($settings as $category_key => $category) {
     if (is_array($category) && !empty($category)) {
-      reset($category);
       if (!in_array($category_key, array('Auto-discovery', 'Manual', 'Custom'))) {
         foreach ($category as $category_name => $category_forms) {
           foreach ($category_forms as $form => $value) {
@@ -261,6 +355,7 @@ function form_reference_options_list($field, $instance = NULL, $entity_type = NU
             }
           }
         }
+        reset($category);
         if (key($category)) {
           $form_options[drupal_ucfirst($category_key)] = $category[key($category)];
         }
@@ -292,15 +387,19 @@ function form_reference_options_list($field, $instance = NULL, $entity_type = NU
   return $form_options;
 }
 
-/*
+/**
  * Returns optional modules for auto-discovery.
  *
- * $return_value - What elements to return.
+ * $return_value
+ *  What element to return.
+ *
+ * @return string
+ *  The element value.
  */
 function form_reference_optional_modules($return_value = 'name') {
   $optional_modules = array(
     'cool' => array(
-      'namespace' =>'Drupal\cool\BaseForm',
+      'namespace' => 'Drupal\cool\BaseForm',
       'name' => 'Cool',
     ),
     'ghost' => array(
@@ -314,4 +413,42 @@ function form_reference_optional_modules($return_value = 'name') {
   }
 
   return $return;
+}
+
+/**
+ * Implements hook_form_reference().
+ *
+ * $forms = array(
+ *  'contact_site_form' => array(
+ *    'name' => t('Contact form'),
+ *    'module' => 'contact',
+ *    'file' => 'contact.pages.inc',
+ *  ),
+ *  'my_form_id' => array(
+ *    'name' => t('Name appears in select options'),
+ *    'module' => 'the_module_the_form_is_in', // Optional.
+ *    'file' => 'file_that_form_is_in.inc', // Optional.
+ *  );
+ */
+function form_reference_form_reference() {
+  $forms = array(
+    'user_login' => array(
+      'name' => t('User Login'),
+    ),
+  );
+
+  return $forms;
+}
+
+/**
+ * Loads forms from other modules implementing hook_form_reference().
+ */
+function form_reference_form_references() {
+  $forms = array();
+  foreach (module_implements('form_reference') as $module) {
+    $module_forms = module_invoke($module, 'form_reference');
+    $forms = array_merge($forms, $module_forms);
+  }
+
+  return $forms;
 }
