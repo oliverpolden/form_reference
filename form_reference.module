@@ -133,7 +133,7 @@ function form_reference_field_settings_form($field, $instance, $has_data) {
   $form['Module specified']['specified'] = array(
     '#type' => 'checkboxes',
     '#title' => t('Module specified'),
-    '#options' => form_reference_form_references(),
+    '#options' => form_reference_form_options(form_reference_form_references()),
     '#default_value' => $field['settings']['Module specified']['specified'],
   );
 
@@ -232,7 +232,7 @@ function form_reference_core_forms() {
 }
 
 /**
- * Validation function for manually entered forms.e
+ * Validation function for manually entered forms.
  *
  * @param $element
  * @param $form_state
@@ -248,11 +248,11 @@ function form_reference_validate($element, &$form_state) {
       // This won't work for class based forms but these should be auto-discovered.
       if (!function_exists($form)) {
         $valid = FALSE;
-        $messages[] = t("The form %form doesn't exist.", array('%form' => $form));
+        $messages[] = t("The form %form could not be found.", array('%form' => $form));
       }
     }
     if (!$valid) {
-      form_error($element, implode('<br />', $messages));
+      form_error($element, check_plain(implode('<br />', $messages)));
     }
   }
 }
@@ -303,10 +303,19 @@ function form_reference_field_formatter_view($entity_type, $entity, $field, $ins
 function form_reference_load_includes($form_id) {
   $forms = form_reference_all_forms();
 
-  if (isset($forms[$form_id]) && isset($forms[$form_id]['file'])) {
+  if (isset($forms[$form_id])) {
     return form_reference_load_include($forms[$form_id], $form_id);
   }
   else {
+    // If it's an auto-discovered form we don't need to load includes.
+    // Check that we can load the form.
+    $optional_modules = form_reference_optional_modules('validation_element');
+    foreach ($optional_modules as $validation_element) {
+      $loaded_form = drupal_get_form($form_id);
+      if (isset($loaded_form[$validation_element])) {
+        return TRUE;
+      }
+    }
     return FALSE;
   }
 }
@@ -401,11 +410,14 @@ function form_reference_optional_modules($return_value = 'name') {
     'cool' => array(
       'namespace' => 'Drupal\cool\BaseForm',
       'name' => 'Cool',
+      'validation_element' => 'cool_class_name', // Existence of this element is checked in validation.
     ),
+    /* Unfortunately ghost classes don't seem to be discoverable.
     'ghost' => array(
       'namespace' => 'Drupal\ghost\Form\BaseForm',
       'name' => 'Ghost',
     ),
+    */
   );
   $return = array();
   foreach ($optional_modules as $module_key => $module) {
