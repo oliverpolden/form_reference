@@ -9,7 +9,11 @@
  */
 function form_reference_field_schema($field) {
   $columns = array(
-    'form_reference' => array('type' => 'varchar', 'length' => 128, 'not null' => FALSE),
+    'form_reference' => array(
+      'type' => 'varchar',
+      'length' => 128,
+      'not null' => FALSE
+    ),
   );
   $indexes = array(
     'form_reference' => array('form_reference'),

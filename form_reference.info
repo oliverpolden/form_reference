@@ -2,4 +2,3 @@ name = Form reference
 description = Load a form in an entity
 package = Other
 core = 7.x
-
