@@ -12,7 +12,7 @@ function form_reference_field_schema($field) {
     'form_reference' => array(
       'type' => 'varchar',
       'length' => 128,
-      'not null' => FALSE
+      'not null' => FALSE,
     ),
   );
   $indexes = array(
