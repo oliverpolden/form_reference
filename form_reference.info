@@ -1,4 +1,4 @@
 name = Form reference
 description = Load a form in an entity
-package = Other
+package = Fields
 core = 7.x
