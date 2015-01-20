@@ -35,11 +35,12 @@ function hook_form_reference() {
     ),
     'page' => array(
       'name' => t('Basic page'),
-      'category' => t('Core'), // Optional
-      'wrapper' => 'node_add', // Optional
-      'module' => 'node', // Optional
-      'file' => 'node.pages.inc', // Optional
-      'validation_element' => '#node_edit_form', // Optional
+      // The following are optional.
+      'category' => t('Core'),
+      'wrapper' => 'node_add',
+      'module' => 'node',
+      'file' => 'node.pages.inc',
+      'validation_element' => '#node_edit_form',
     ),
   );
 
