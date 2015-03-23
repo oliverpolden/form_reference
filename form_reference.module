@@ -254,6 +254,8 @@ function form_reference_field_formatter_view($entity_type, $entity, $field, $ins
   $element = array();
   switch ($display['type']) {
     case 'form_reference_form':
+      // Store entity title to avoid form overwriting it.
+      $title = $entity->title;
       foreach ($items as $delta => $item) {
         form_reference_load_includes($item['form_reference']);
         // Get form definition.
@@ -265,6 +267,8 @@ function form_reference_field_formatter_view($entity_type, $entity, $field, $ins
           $element[$delta] = drupal_get_form($item['form_reference']);
         }
       }
+      // Reinstate entity title.
+      drupal_set_title($title);
       break;
   }
 
@@ -383,6 +387,13 @@ function form_reference_options_list($field, $instance = NULL, $entity_type = NU
     }
   }
 
+  // Hide empty categories.
+  foreach ($form_options as $category => $options) {
+    if (count($options) == 0) {
+      unset($form_options[$category]);
+    }
+  }
+
   return $form_options;
 }
 
@@ -444,6 +455,18 @@ function form_reference_form_reference() {
     'search_form' => array(
       'name' => t('Search form'),
       'category' => t('Core'),
+    ),
+    'block_add_block_form' => array(
+      'name' => t('Add block'),
+      'category' => t('Core'),
+      'module' => 'block',
+      'file' => 'block.admin.inc',
+    ),
+    'taxonomy_form_vocabulary' => array(
+      'name' => t('Add vocabulary'),
+      'category' => t('Core'),
+      'module' => 'taxonomy',
+      'file' => 'taxonomy.admin.inc',
     ),
   );
 
