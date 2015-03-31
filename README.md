@@ -8,8 +8,10 @@ load a form within an entity.
 RECOMMENDED MODULES
 -------------------
 
- * Xautoload - https://www.drupal.org/project/xautoload
- * COOL - https://www.drupal.org/project/cool
+ * Xautoload (Enables class autoloading PSR4) - 
+   https://www.drupal.org/project/xautoload
+ * COOL (Common Object Oriented Library - Brings some Drupal 8 OO standards to
+   Drupal 7) - https://www.drupal.org/project/cool
 
 These two modules allow PSR-4 strategy for defining forms. This is an elegant
 way of creating forms that are defined in their own files and are autoloaded.

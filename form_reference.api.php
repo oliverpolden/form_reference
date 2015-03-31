@@ -46,3 +46,7 @@ function hook_form_reference() {
 
   return $forms;
 }
+
+/**
+ * @} End of "addtogroup hooks".
+ */
