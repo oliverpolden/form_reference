@@ -431,7 +431,7 @@ function form_reference_optional_modules($return_value = 'name') {
       'namespace' => 'Drupal\ghost\Form\BaseForm',
       'name' => 'Ghost',
     ),
-    */
+     */
   );
   $return = array();
   foreach ($optional_modules as $module_key => $module) {
@@ -550,7 +550,7 @@ function form_reference_permission() {
   return array(
     'add custom forms' => array(
       'title' => t('Add custom forms'),
-      'description' => t('Allow custom forms to be specified in a form reference field.')
+      'description' => t('Allow custom forms to be specified in a form reference field.'),
     ),
   );
 }
