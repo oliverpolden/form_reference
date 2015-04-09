@@ -44,14 +44,6 @@ A form exists but it won't load:
    See form_reference_form_reference().
 
 
-NOTES
------
-
-This module assumes that only appropriate users have permission to configure a
-form reference field and they should be vigilant about the forms they allow
-users to select e.g. search vs permissions form.
-
-
 KNOWN ISSUES
 ------------
 

@@ -125,22 +125,34 @@ function form_reference_field_settings_form($field, $instance, $has_data) {
   // Manual entry.
   $form['Manual'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Manual'),
+    '#title' => t('Manual ⚠'),
     '#description' => t('Manually specify forms that can be referenced.'),
     '#collapsible' => TRUE,
     '#collapsed' => TRUE,
   );
-  $form['Manual']['custom']['custom'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Pre-defined'),
-    '#description' => t(
-      'Manually enter forms that can be referenced.<br />
-      One form_id per line.<br />
-      This is typically the parameter that is passed to drupal_get_form().'
-    ),
-    '#default_value' => $field['settings']['Manual']['custom']['custom'],
-    '#element_validate' => array('form_reference_validate'),
-  );
+  // Only users with 'add custom forms' permission can see this.
+  if (user_access('add custom forms')) {
+    $form['Manual']['warning'] = array(
+      '#markup' => t("<strong>WARNING!</strong> Be vigilant with forms added here.<br />
+      e.g. Adding the permissions form could allow anonymous users to give themselves administrator permissions!"),
+    );
+    $form['Manual']['custom']['custom'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Custom forms'),
+      '#description' => t(
+        'Manually enter forms that can be referenced.<br />
+         One form_id per line.<br />
+         This is typically the parameter that is passed to drupal_get_form().'
+      ),
+      '#default_value' => $field['settings']['Manual']['custom']['custom'],
+      '#element_validate' => array('form_reference_validate'),
+    );
+  }
+  else {
+    $form['Manual']['notice'] = array(
+      '#markup' => t("Only users with 'Add custom forms' permission can add custom forms."),
+    );
+  }
 
   return $form;
 }
@@ -529,4 +541,16 @@ function form_reference_help($path, $arg) {
 
       return $output;
   }
+}
+
+/**
+ * Implements hook_permission().
+ */
+function form_reference_permission() {
+  return array(
+    'add custom forms' => array(
+      'title' => t('Add custom forms'),
+      'description' => t('Allow custom forms to be specified in a form reference field.')
+    ),
+  );
 }
